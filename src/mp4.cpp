@@ -1,5 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <sstream>
@@ -10,11 +11,32 @@ int main(int argc, char * argv[])
     auto node = rclcpp::Node::make_shared("mp4_to_ros2");
 
     std::string video_file, frame_id;
+    bool bag_sync = true;
     node->declare_parameter("video_file", video_file);
     node->declare_parameter("frame_id", frame_id);
+    node->declare_parameter("bag_sync", bag_sync);
 
     node->get_parameter("video_file", video_file);
     node->get_parameter("frame_id", frame_id);
+    node->get_parameter("bag_sync", bag_sync);
+
+    if (bag_sync) {
+        RCLCPP_INFO(node->get_logger(), "Waiting for IMU message to start video publishing");
+        bool imu_received = false;
+        auto sensor_qos = rclcpp::SensorDataQoS();
+        auto imu_sub = node->create_subscription<sensor_msgs::msg::Imu>("/mavros/imu/data", sensor_qos, [&imu_received](sensor_msgs::msg::Imu::SharedPtr) {
+            RCLCPP_INFO(rclcpp::get_logger("simple_wait_for_message"), "Received imu");
+            imu_received = true;
+        });
+
+        // Block execution until a message is received
+        rclcpp::Rate rate(10);  // 10 Hz loop rate
+        while (rclcpp::ok() && !imu_received) {
+            rclcpp::spin_some(node);
+            rate.sleep();
+        }
+        imu_sub.reset();
+    }
 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr publisher =
         node->create_publisher<sensor_msgs::msg::Image>("/mp4/video_frames", 10);

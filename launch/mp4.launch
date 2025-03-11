@@ -1,9 +1,11 @@
 <launch>
     <arg name="video_file" default="my_video.mp4"/>
     <arg name="frame_id" default="mp4"/>
+    <arg name="bag_sync" default="true"/>
 
     <node pkg="mp4_to_ros2" exec="mp4_node" output="screen">
         <param name="video_file" value="$(var video_file)"/>
         <param name="frame_id" value="$(var frame_id)"/>
+        <param name="bag_sync" value="$(var bag_sync)"/>
     </node>
 </launch>
