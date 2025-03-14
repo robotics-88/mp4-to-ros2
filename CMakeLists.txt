@@ -15,6 +15,9 @@ find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(camera_info_manager REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 add_executable(mp4_node
   src/mp4.cpp
@@ -29,6 +32,9 @@ ament_target_dependencies(mp4_node
   cv_bridge
   sensor_msgs
   camera_info_manager
+  tf2
+  tf2_ros
+  geometry_msgs
 )
 
 install(TARGETS

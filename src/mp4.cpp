@@ -5,6 +5,10 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <camera_info_manager/camera_info_manager.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <fstream>
 #include <sstream>
 
 int main(int argc, char * argv[])
@@ -43,7 +47,7 @@ int main(int argc, char * argv[])
     }
 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_publisher =
-        node->create_publisher<sensor_msgs::msg::Image>("/mp4/video_frames", 10);
+        node->create_publisher<sensor_msgs::msg::Image>("/mp4/image_raw", 10);
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_publisher =
         node->create_publisher<sensor_msgs::msg::CameraInfo>("/mp4/camera_info", 10);
 
@@ -58,7 +62,10 @@ int main(int argc, char * argv[])
     rclcpp::Time start_time = node->get_clock()->now();
 
     // Get time from video filename if possible
-    std::string base_filename = video_file.substr(video_file.find_last_of("//") + 1);
+    int index = video_file.find_last_of("//");
+    std::cout << "video_file: " << video_file << std::endl;
+    std::string base_path = video_file.substr(0, index);
+    std::string base_filename = video_file.substr(index + 1);
     std::string::size_type const p(base_filename.find_last_of('.'));
     base_filename = base_filename.substr(0, p);
     std::tm tm = {}; 
@@ -80,6 +87,19 @@ int main(int argc, char * argv[])
     camera_info_manager::CameraInfoManager cam_info_manager(node.get(), "mp4", camera_info_url);
     sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg = std::make_shared<sensor_msgs::msg::CameraInfo>(cam_info_manager.getCameraInfo());
 
+    // TF2 buffer and listener
+    tf2_ros::Buffer tf_buffer(node->get_clock());
+    tf2_ros::TransformListener tf_listener(tf_buffer);
+
+    // Open file to write camera positions
+    std::ofstream pose_file_(base_path + "/camera_positions.txt");
+    if (!pose_file_.is_open()) {
+        RCLCPP_ERROR(node->get_logger(), "Error opening camera_positions.txt");
+    }
+    else {
+        RCLCPP_INFO(node->get_logger(), "Camera positions will be written to %s", (base_path + "camera_positions.txt").c_str());
+    }
+
     cv::Mat frame;
     sensor_msgs::msg::Image::SharedPtr image_msg;
     rclcpp::WallRate loop_rate(fps); // Adjust the rate as needed
@@ -98,6 +118,25 @@ int main(int argc, char * argv[])
             header.stamp = start_time + t;
             image_msg = cv_bridge::CvImage(header, "bgr8", frame).toImageMsg();
             camera_info_msg->header = header;
+
+            // Get the transform from camera to map
+            geometry_msgs::msg::TransformStamped transform_stamped;
+            std::string image_name = "image_" + std::to_string(frame_count) + ".png";
+            try {
+                transform_stamped = tf_buffer.lookupTransform("map", frame_id, tf2::TimePointZero);
+                pose_file_  << frame_count << " ";
+                pose_file_  << transform_stamped.transform.rotation.w << " " 
+                            << transform_stamped.transform.rotation.x << " "
+                            << transform_stamped.transform.rotation.y << " " 
+                            << transform_stamped.transform.rotation.z << " ";
+                pose_file_  << transform_stamped.transform.translation.x << " " 
+                            << transform_stamped.transform.translation.y << " " 
+                            << transform_stamped.transform.translation.z << " ";
+                pose_file_  << "mp4" << " " << image_name << "\n";
+                pose_file_  << "\n"; // Leave blank line between frames
+            } catch (tf2::TransformException &ex) {
+                RCLCPP_WARN(node->get_logger(), "Could not transform %s to map: %s", frame_id.c_str(), ex.what());
+            }
         } 
         catch (cv_bridge::Exception& e) 
         {
@@ -112,6 +151,7 @@ int main(int argc, char * argv[])
         loop_rate.sleep();
     }
 
+    pose_file_.close();
     rclcpp::shutdown();
     return 0;
 }
