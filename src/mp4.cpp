@@ -4,7 +4,7 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
-#include <camera_info_manager/camera_info_manager.hpp>
+#include <camera_calibration_parsers/parse.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -84,8 +84,9 @@ int main(int argc, char * argv[])
 
     // Load camera info
     std::string camera_info_url = "file://" + camera_info_file;
-    camera_info_manager::CameraInfoManager cam_info_manager(node.get(), "mp4", camera_info_url);
-    sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg = std::make_shared<sensor_msgs::msg::CameraInfo>(cam_info_manager.getCameraInfo());
+    std::string camera_name = "mp4";
+    sensor_msgs::msg::CameraInfo camera_info_;
+    camera_calibration_parsers::readCalibration( camera_info_url, camera_name, camera_info_);
 
     // TF2 buffer and listener
     tf2_ros::Buffer tf_buffer(node->get_clock());
@@ -117,7 +118,7 @@ int main(int argc, char * argv[])
             rclcpp::Duration t(sec, nsec);
             header.stamp = start_time + t;
             image_msg = cv_bridge::CvImage(header, "bgr8", frame).toImageMsg();
-            camera_info_msg->header = header;
+            camera_info_.header = header;
 
             // Get the transform from camera to map
             geometry_msgs::msg::TransformStamped transform_stamped;
@@ -146,7 +147,7 @@ int main(int argc, char * argv[])
         frame_count++;
 
         image_publisher->publish(*image_msg);
-        camera_info_publisher->publish(*camera_info_msg);
+        camera_info_publisher->publish(camera_info_);
         rclcpp::spin_some(node);
         loop_rate.sleep();
     }

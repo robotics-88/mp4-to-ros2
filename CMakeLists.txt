@@ -14,7 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(camera_info_manager REQUIRED)
+find_package(camera_calibration_parsers REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -31,7 +31,7 @@ ament_target_dependencies(mp4_node
   rclcpp
   cv_bridge
   sensor_msgs
-  camera_info_manager
+  camera_calibration_parsers
   tf2
   tf2_ros
   geometry_msgs
