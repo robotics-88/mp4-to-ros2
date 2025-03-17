@@ -8,16 +8,23 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(EXIV2 REQUIRED exiv2)
+include_directories(${EXIV2_INCLUDE_DIRS})
+link_directories(${EXIV2_LIBRARY_DIRS})
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(OpenCV REQUIRED)
 find_package(camera_calibration_parsers REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(messages_88 REQUIRED)
+
+find_package(OpenCV REQUIRED)
 
 add_executable(mp4_node
   src/mp4.cpp
@@ -25,6 +32,7 @@ add_executable(mp4_node
 
 target_link_libraries(mp4_node 
   ${OpenCV_LIBRARIES}
+  ${EXIV2_LIBRARIES}
 )
 
 ament_target_dependencies(mp4_node
@@ -35,6 +43,7 @@ ament_target_dependencies(mp4_node
   tf2
   tf2_ros
   geometry_msgs
+  messages_88
 )
 
 install(TARGETS
