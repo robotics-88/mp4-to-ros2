@@ -62,18 +62,20 @@ int main(int argc, char * argv[])
     auto node = rclcpp::Node::make_shared("mp4_to_ros2");
 
     std::string video_file, frame_id, camera_info_file;
-    bool bag_sync = true;
+    bool bag_sync = true, save_splat_images = false;
     int splat_fps;
     node->declare_parameter("video_file", video_file);
     node->declare_parameter("frame_id", frame_id);
     node->declare_parameter("bag_sync", bag_sync);
     node->declare_parameter("camera_info_file", camera_info_file);
+    node->declare_parameter("save_splat_images", save_splat_images);
     node->declare_parameter("splat_fps", splat_fps);
 
     node->get_parameter("video_file", video_file);
     node->get_parameter("frame_id", frame_id);
     node->get_parameter("bag_sync", bag_sync);
     node->get_parameter("camera_info_file", camera_info_file);
+    node->get_parameter("save_splat_images", save_splat_images);
     node->get_parameter("splat_fps", splat_fps);
 
     rclcpp::Client<messages_88::srv::Geopoint>::SharedPtr geo_client_ = node->create_client<messages_88::srv::Geopoint>("/task_manager/slam2geo");
@@ -138,10 +140,10 @@ int main(int argc, char * argv[])
     }
 
     // Load camera info
-    std::string camera_info_url = "file://" + camera_info_file;
+    // std::string camera_info_url = camera_info_file;
     std::string camera_name = "mp4";
     sensor_msgs::msg::CameraInfo camera_info_;
-    camera_calibration_parsers::readCalibration(camera_info_url, camera_name, camera_info_);
+    camera_calibration_parsers::readCalibration(camera_info_file, camera_name, camera_info_);
 
     // TF2 buffer and listener
     tf2_ros::Buffer tf_buffer(node->get_clock());
@@ -171,8 +173,13 @@ int main(int argc, char * argv[])
             image_msg = cv_bridge::CvImage(header, "bgr8", frame).toImageMsg();
             camera_info_.header = header;
 
-            if (frame_count % splat_fps != 0) {
+            if (!save_splat_images || frame_count % splat_fps != 0) {
                 frame_count++;
+
+                image_publisher->publish(*image_msg);
+                camera_info_publisher->publish(camera_info_);
+                rclcpp::spin_some(node);
+                loop_rate.sleep();
                 continue;
             }
 
