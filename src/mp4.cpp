@@ -61,11 +61,12 @@ int main(int argc, char * argv[])
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("mp4_to_ros2");
 
-    std::string video_file, frame_id, camera_info_file;
+    std::string video_file, frame_id, camera_info_file, camera_name;
     bool bag_sync = true, save_splat_images = false;
     int splat_fps;
     node->declare_parameter("video_file", video_file);
     node->declare_parameter("frame_id", frame_id);
+    node->declare_parameter("camera_name", camera_name);
     node->declare_parameter("bag_sync", bag_sync);
     node->declare_parameter("camera_info_file", camera_info_file);
     node->declare_parameter("save_splat_images", save_splat_images);
@@ -73,6 +74,7 @@ int main(int argc, char * argv[])
 
     node->get_parameter("video_file", video_file);
     node->get_parameter("frame_id", frame_id);
+    node->get_parameter("camera_name", camera_name);
     node->get_parameter("bag_sync", bag_sync);
     node->get_parameter("camera_info_file", camera_info_file);
     node->get_parameter("save_splat_images", save_splat_images);
@@ -104,9 +106,9 @@ int main(int argc, char * argv[])
     }
 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_publisher =
-        node->create_publisher<sensor_msgs::msg::Image>("/mp4/image_raw", 10);
+        node->create_publisher<sensor_msgs::msg::Image>(camera_name + "/image_raw", 10);
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_publisher =
-        node->create_publisher<sensor_msgs::msg::CameraInfo>("/mp4/camera_info", 10);
+        node->create_publisher<sensor_msgs::msg::CameraInfo>(camera_name + "/camera_info", 10);
 
     cv::VideoCapture cap(video_file); 
     if (!cap.isOpened())
@@ -141,7 +143,6 @@ int main(int argc, char * argv[])
 
     // Load camera info
     // std::string camera_info_url = camera_info_file;
-    std::string camera_name = "mp4";
     sensor_msgs::msg::CameraInfo camera_info_;
     camera_calibration_parsers::readCalibration(camera_info_file, camera_name, camera_info_);
 
@@ -149,7 +150,7 @@ int main(int argc, char * argv[])
     tf2_ros::Buffer tf_buffer(node->get_clock());
     tf2_ros::TransformListener tf_listener(tf_buffer);
 
-    std::string outputDir = base_path + "/camera";
+    std::string outputDir = base_path + "/" + camera_name + "_images";
     if (!std::filesystem::exists(outputDir)) {
         std::filesystem::create_directory(outputDir);
     }
