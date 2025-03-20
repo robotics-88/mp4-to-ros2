@@ -5,7 +5,7 @@
 
     <arg name="bag_sync" default="true"/>
     <arg name="camera_info_file" default="camera_info.yaml"/>
-    <arg name="save_splat_images" default="true"/>
+    <arg name="save_splat_images" default="false"/>
     <arg name="splat_fps" default="5"/>
 
     <node pkg="mp4_to_ros2" exec="mp4_node" output="screen">
