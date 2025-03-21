@@ -107,7 +107,9 @@ void embedGPSData(const std::string& imagePath, double latitude, double longitud
         exifData["Exif.GPSInfo.GPSLongitudeRef"] = longitude >= 0 ? "E" : "W";
 
         // Write altitude data
-        exifData["Exif.GPSInfo.GPSAltitudeRef"] = 0; // 0 = above sea level, 1 = below sea level
+        Exiv2::Value::AutoPtr altRef = Exiv2::Value::create(Exiv2::unsignedByte);
+        altRef->read("0");  // "0" indicates above sea level
+        exifData["Exif.GPSInfo.GPSAltitudeRef"] = *altRef;  // Dereference here
         exifData["Exif.GPSInfo.GPSAltitude"] = Exiv2::Rational(static_cast<int>(altitude * 100), 100);
 
         // Write DOP (Dilution of Precision)
@@ -266,7 +268,7 @@ int main(int argc, char * argv[])
                             // RCLCPP_INFO(node->get_logger(), "Got lat/long for image: %f, %f. Home: %f", lat, lon, home_alt);
 
                             // Save image
-                            std::string image_name = outputDir + "/image_" + std::to_string(frame_count) + ".png";
+                            std::string image_name = outputDir + "/image_" + std::to_string(frame_count) + ".jpg";
                             cv::imwrite(image_name, frame); // Save the frame
             
                             double altitude = transform_stamped.transform.translation.z + home_alt;
