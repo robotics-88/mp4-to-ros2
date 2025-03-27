@@ -17,6 +17,11 @@
   <depend>sensor_msgs</depend>
   <depend>messages_88</depend>
 
+  <depend>libexiv2-dev</depend>
+  <depend>libimage-exiftool-perl</depend>
+  <depend>exiv2</depend>
+  <depend>libexif-dev</depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>
