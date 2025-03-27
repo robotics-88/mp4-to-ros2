@@ -18,20 +18,6 @@
 
 using namespace std::chrono_literals;
 
-std::vector<Exiv2::Rational> convertToDMS(double decimalDegree) {
-    double absVal = std::fabs(decimalDegree);
-    int degrees = static_cast<int>(absVal);
-    double fractional = absVal - degrees;
-    int minutes = static_cast<int>(fractional * 60);
-    double seconds = (fractional * 60 - minutes) * 60;
-    // Using a factor (here 100) to preserve decimals; adjust as needed
-    return {
-        Exiv2::Rational(degrees, 1),
-        Exiv2::Rational(minutes, 1),
-        Exiv2::Rational(static_cast<int>(seconds * 100), 100)
-    };
-}
-
 void embedGPSData(const std::string& imagePath, double latitude, double longitude, double altitude, rclcpp::Time timestamp) {
     try {
         Exiv2::Image::AutoPtr image = Exiv2::ImageFactory::open(imagePath);
