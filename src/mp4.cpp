@@ -250,7 +250,7 @@ int main(int argc, char * argv[])
                             auto response = geo_res.get();
                             lat = response->latitude;
                             lon = response->longitude;
-                            home_alt = 1215.2239024774262; //response->home_altitude;
+                            home_alt = response->home_altitude;
                             // RCLCPP_INFO(node->get_logger(), "Got lat/long for image: %f, %f. Home: %f", lat, lon, home_alt);
 
                             // Save image
