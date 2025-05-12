@@ -1,24 +1,25 @@
+#include "messages_88/srv/geopoint.hpp"
+#include <camera_calibration_parsers/parse.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <opencv2/opencv.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
-#include <sensor_msgs/msg/camera_info.hpp>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
-#include <camera_calibration_parsers/parse.hpp>
-#include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
-#include <geometry_msgs/msg/transform_stamped.hpp>
-#include "messages_88/srv/geopoint.hpp"
+#include <tf2_ros/transform_listener.h>
 
+#include <exiv2/exiv2.hpp>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <exiv2/exiv2.hpp>
 
 using namespace std::chrono_literals;
 
-void embedGPSData(const std::string& imagePath, double latitude, double longitude, double altitude, rclcpp::Time timestamp) {
+void embedGPSData(const std::string &imagePath, double latitude, double longitude, double altitude,
+                  rclcpp::Time timestamp) {
     try {
         Exiv2::Image::AutoPtr image = Exiv2::ImageFactory::open(imagePath);
         if (!image.get()) {
@@ -42,25 +43,22 @@ void embedGPSData(const std::string& imagePath, double latitude, double longitud
         // Convert decimal latitude to DMS as a vector of Exiv2::Rational values
         std::vector<Exiv2::Rational> latValues = {
             Exiv2::Rational(static_cast<int>(std::fabs(latitude)), 1),
-            Exiv2::Rational(static_cast<int>((std::fabs(latitude) - static_cast<int>(std::fabs(latitude))) * 60), 1),
+            Exiv2::Rational(static_cast<int>(
+                                (std::fabs(latitude) - static_cast<int>(std::fabs(latitude))) * 60),
+                            1),
             Exiv2::Rational(
                 static_cast<int>(
-                    (
-                        ((std::fabs(latitude) - static_cast<int>(std::fabs(latitude))) * 60
-                         - static_cast<int>((std::fabs(latitude) - static_cast<int>(std::fabs(latitude))) * 60))
-                        * 60 * 1000
-                    )
-                ),
-                1000
-            )
-        };
+                    (((std::fabs(latitude) - static_cast<int>(std::fabs(latitude))) * 60 -
+                      static_cast<int>(
+                          (std::fabs(latitude) - static_cast<int>(std::fabs(latitude))) * 60)) *
+                     60 * 1000)),
+                1000)};
         // Create an Exiv2::Value object of type unsignedRational
         Exiv2::Value::AutoPtr latValue = Exiv2::Value::create(Exiv2::unsignedRational);
         // Load the raw bytes from the vector into the value.
         // Note: reinterpret_cast to Exiv2::byte* is required.
-        latValue->read(reinterpret_cast<const Exiv2::byte*>(latValues.data()),
-                    latValues.size() * sizeof(Exiv2::Rational),
-                    Exiv2::littleEndian);
+        latValue->read(reinterpret_cast<const Exiv2::byte *>(latValues.data()),
+                       latValues.size() * sizeof(Exiv2::Rational), Exiv2::littleEndian);
         // Add the value to the ExifData
         exifData.add(Exiv2::ExifKey("Exif.GPSInfo.GPSLatitude"), latValue.get());
         exifData["Exif.GPSInfo.GPSLatitudeRef"] = latitude >= 0 ? "N" : "S";
@@ -69,34 +67,33 @@ void embedGPSData(const std::string& imagePath, double latitude, double longitud
         // Convert decimal longitude to DMS as a vector of Exiv2::Rational values
         std::vector<Exiv2::Rational> lonValues = {
             Exiv2::Rational(static_cast<int>(std::fabs(longitude)), 1),
-            Exiv2::Rational(static_cast<int>((std::fabs(longitude) - static_cast<int>(std::fabs(longitude))) * 60), 1),
+            Exiv2::Rational(
+                static_cast<int>((std::fabs(longitude) - static_cast<int>(std::fabs(longitude))) *
+                                 60),
+                1),
             Exiv2::Rational(
                 static_cast<int>(
-                    (
-                        ((std::fabs(longitude) - static_cast<int>(std::fabs(longitude))) * 60
-                         - static_cast<int>((std::fabs(longitude) - static_cast<int>(std::fabs(longitude))) * 60))
-                        * 60 * 1000
-                    )
-                ),
-                1000
-            )
-        };
+                    (((std::fabs(longitude) - static_cast<int>(std::fabs(longitude))) * 60 -
+                      static_cast<int>(
+                          (std::fabs(longitude) - static_cast<int>(std::fabs(longitude))) * 60)) *
+                     60 * 1000)),
+                1000)};
         // Create an Exiv2::Value object of type unsignedRational
         Exiv2::Value::AutoPtr lonValue = Exiv2::Value::create(Exiv2::unsignedRational);
         // Load the raw bytes from the vector into the value.
         // Note: reinterpret_cast to Exiv2::byte* is required.
-        lonValue->read(reinterpret_cast<const Exiv2::byte*>(lonValues.data()),
-                    latValues.size() * sizeof(Exiv2::Rational),
-                    Exiv2::littleEndian);
+        lonValue->read(reinterpret_cast<const Exiv2::byte *>(lonValues.data()),
+                       latValues.size() * sizeof(Exiv2::Rational), Exiv2::littleEndian);
         // Add the value to the ExifData
         exifData.add(Exiv2::ExifKey("Exif.GPSInfo.GPSLongitude"), lonValue.get());
         exifData["Exif.GPSInfo.GPSLongitudeRef"] = longitude >= 0 ? "E" : "W";
 
         // Write altitude data
         Exiv2::Value::AutoPtr altRef = Exiv2::Value::create(Exiv2::unsignedByte);
-        altRef->read("0");  // "0" indicates above sea level
-        exifData["Exif.GPSInfo.GPSAltitudeRef"] = *altRef;  // Dereference here
-        exifData["Exif.GPSInfo.GPSAltitude"] = Exiv2::Rational(static_cast<int>(altitude * 100), 100);
+        altRef->read("0");                                 // "0" indicates above sea level
+        exifData["Exif.GPSInfo.GPSAltitudeRef"] = *altRef; // Dereference here
+        exifData["Exif.GPSInfo.GPSAltitude"] =
+            Exiv2::Rational(static_cast<int>(altitude * 100), 100);
 
         // Write DOP (Dilution of Precision)
         double dop = 5.0; // Default value
@@ -104,13 +101,12 @@ void embedGPSData(const std::string& imagePath, double latitude, double longitud
 
         image->setExifData(exifData);
         image->writeMetadata();
-    } catch (const Exiv2::AnyError& e) {
+    } catch (const Exiv2::AnyError &e) {
         std::cerr << "EXIF writing error: " << e.what() << std::endl;
     }
 }
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("mp4_to_ros2");
 
@@ -133,7 +129,8 @@ int main(int argc, char * argv[])
     node->get_parameter("save_splat_images", save_splat_images);
     node->get_parameter("splat_fps", splat_fps);
 
-    rclcpp::Client<messages_88::srv::Geopoint>::SharedPtr geo_client_ = node->create_client<messages_88::srv::Geopoint>("/task_manager/slam2geo");
+    rclcpp::Client<messages_88::srv::Geopoint>::SharedPtr geo_client_ =
+        node->create_client<messages_88::srv::Geopoint>("/task_manager/slam2geo");
     // Ensure service client is available
     if (!geo_client_->wait_for_service(std::chrono::seconds(10))) {
         RCLCPP_ERROR(node->get_logger(), "Geo service unavailable, skipping EXIF.");
@@ -154,7 +151,7 @@ int main(int argc, char * argv[])
             });
 
         // Block execution until a message is received
-        rclcpp::Rate rate(10);  // 10 Hz loop rate
+        rclcpp::Rate rate(10); // 10 Hz loop rate
         while (rclcpp::ok() && !imu_received) {
             rclcpp::spin_some(node);
             rate.sleep();
@@ -167,9 +164,8 @@ int main(int argc, char * argv[])
     rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_publisher =
         node->create_publisher<sensor_msgs::msg::CameraInfo>(camera_name + "/camera_info", 10);
 
-    cv::VideoCapture cap(video_file); 
-    if (!cap.isOpened())
-    {
+    cv::VideoCapture cap(video_file);
+    if (!cap.isOpened()) {
         RCLCPP_ERROR(node->get_logger(), "Error opening video file");
         return 1;
     }
@@ -184,15 +180,15 @@ int main(int argc, char * argv[])
     std::string base_filename = video_file.substr(index + 1);
     std::string::size_type const p(base_filename.find_last_of('.'));
     base_filename = base_filename.substr(0, p);
-    std::tm tm = {}; 
+    std::tm tm = {};
     std::istringstream ss(base_filename);
     // Parse the string into the tm struct
-    ss >> std::get_time(&tm, "%Y-%m-%d_%H-%M-%S"); 
+    ss >> std::get_time(&tm, "%Y-%m-%d_%H-%M-%S");
     if (ss.fail()) {
         // start_time = node->get_clock()->now();
-        std::cerr << "Error parsing date/time string, frame timestamps will start at ros bag time" << std::endl;
-    }
-    else {
+        std::cerr << "Error parsing date/time string, frame timestamps will start at ros bag time"
+                  << std::endl;
+    } else {
         // Convert tm to time_t
         std::time_t time = std::mktime(&tm);
         start_time = rclcpp::Time(time, 0); // Need to get fractional seconds storing
@@ -216,10 +212,8 @@ int main(int argc, char * argv[])
     sensor_msgs::msg::Image::SharedPtr image_msg;
     rclcpp::WallRate loop_rate(fps);
 
-    while (rclcpp::ok() && cap.read(frame))
-    {
-        try 
-        {
+    while (rclcpp::ok() && cap.read(frame)) {
+        try {
             std_msgs::msg::Header header;
             header.frame_id = frame_id;
             double timestamp_seconds = frame_count / fps;
@@ -235,48 +229,49 @@ int main(int argc, char * argv[])
                 // Get the transform from camera to map
                 geometry_msgs::msg::TransformStamped transform_stamped;
                 try {
-                    transform_stamped = tf_buffer.lookupTransform("map", frame_id, tf2::TimePointZero);
+                    transform_stamped =
+                        tf_buffer.lookupTransform("map", frame_id, tf2::TimePointZero);
                     // Get lat/long for image
-                    auto geo_request = std::make_shared<messages_88::srv::Geopoint::Request>(); 
+                    auto geo_request = std::make_shared<messages_88::srv::Geopoint::Request>();
                     geo_request->slam_position.x = transform_stamped.transform.translation.x;
                     geo_request->slam_position.y = transform_stamped.transform.translation.y;
                     geo_request->slam_position.z = transform_stamped.transform.translation.z;
                     auto geo_res = geo_client_->async_send_request(geo_request);
                     double lat, lon, home_alt;
-                    if (rclcpp::spin_until_future_complete(node, geo_res, 1s) == rclcpp::FutureReturnCode::SUCCESS)
-                    {
-                        try
-                        {
+                    if (rclcpp::spin_until_future_complete(node, geo_res, 1s) ==
+                        rclcpp::FutureReturnCode::SUCCESS) {
+                        try {
                             auto response = geo_res.get();
                             lat = response->latitude;
                             lon = response->longitude;
                             home_alt = response->home_altitude;
-                            // RCLCPP_INFO(node->get_logger(), "Got lat/long for image: %f, %f. Home: %f", lat, lon, home_alt);
+                            // RCLCPP_INFO(node->get_logger(), "Got lat/long for image: %f, %f.
+                            // Home: %f", lat, lon, home_alt);
 
                             // Save image
-                            std::string image_name = outputDir + "/image_" + std::to_string(frame_count) + ".jpg";
+                            std::string image_name =
+                                outputDir + "/image_" + std::to_string(frame_count) + ".jpg";
                             cv::imwrite(image_name, frame); // Save the frame
-            
+
                             double altitude = transform_stamped.transform.translation.z + home_alt;
-                            embedGPSData(image_name, lat, lon, altitude, start_time + t); // Embed GPS data
+                            embedGPSData(image_name, lat, lon, altitude,
+                                         start_time + t); // Embed GPS data
+                        } catch (const std::exception &e) {
+                            RCLCPP_INFO(
+                                node->get_logger(),
+                                "Geo service call failed, no lat/long available for EXIF data.");
                         }
-                        catch (const std::exception &e)
-                        {
-                            RCLCPP_INFO(node->get_logger(), "Geo service call failed, no lat/long available for EXIF data.");
-                        }
-                    
+
                     } else {
                         RCLCPP_ERROR(node->get_logger(), "Failed to get lat/long, no EXIF.");
                     }
-    
-                } catch (tf2::TransformException &ex) {
-                    RCLCPP_WARN(node->get_logger(), "Could not transform %s to map: %s", frame_id.c_str(), ex.what());
-                }
 
+                } catch (tf2::TransformException &ex) {
+                    RCLCPP_WARN(node->get_logger(), "Could not transform %s to map: %s",
+                                frame_id.c_str(), ex.what());
+                }
             }
-        } 
-        catch (cv_bridge::Exception& e) 
-        {
+        } catch (cv_bridge::Exception &e) {
             RCLCPP_ERROR(node->get_logger(), "cv_bridge exception: %s", e.what());
         }
         frame_count++;
