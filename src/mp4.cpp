@@ -134,14 +134,15 @@ int main(int argc, char * argv[])
     node->get_parameter("splat_fps", splat_fps);
 
     rclcpp::Client<messages_88::srv::Geopoint>::SharedPtr geo_client_ = node->create_client<messages_88::srv::Geopoint>("/task_manager/slam2geo");
-    // Ensure service client is available
-    if (!geo_client_->wait_for_service(std::chrono::seconds(10))) {
-        RCLCPP_ERROR(node->get_logger(), "Geo service unavailable, skipping EXIF.");
-        return 1;
-    }
-
+    
     rclcpp::Time start_time;
     if (bag_sync) {
+        // Ensure service client is available
+        if (!geo_client_->wait_for_service(std::chrono::seconds(10))) {
+            RCLCPP_ERROR(node->get_logger(), "Geo service unavailable, skipping EXIF.");
+            return 1;
+        }
+
         RCLCPP_INFO(node->get_logger(), "Waiting for IMU message to start video publishing");
         bool imu_received = false;
         auto sensor_qos = rclcpp::SensorDataQoS();
