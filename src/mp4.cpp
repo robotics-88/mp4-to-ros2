@@ -138,7 +138,7 @@ int main(int argc, char * argv[])
     rclcpp::Time start_time;
     if (bag_sync) {
         // Ensure service client is available
-        if (!geo_client_->wait_for_service(std::chrono::seconds(10))) {
+        if (save_splat_images && !geo_client_->wait_for_service(std::chrono::seconds(10))) {
             RCLCPP_ERROR(node->get_logger(), "Geo service unavailable, skipping EXIF.");
             return 1;
         }
